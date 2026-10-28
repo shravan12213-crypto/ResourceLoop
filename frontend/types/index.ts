@@ -59,3 +59,5 @@ export interface SystemHealth {
     details: string;
   };
 }
+
+export * from "./resource";

@@ -1,122 +1,187 @@
-import React from "react";
+"use client";
+
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import {
+  Sparkles,
+  Building,
+  CheckCircle2,
+  Clock,
+  Wrench,
+  Layers,
+  ArrowLeft,
+} from "lucide-react";
+import { ResourceItem, ResourceCategory, ResourceStatus } from "@/types/resource";
+import { MOCK_RESOURCES } from "@/data/mock-resources";
+import { getResourceStats } from "@/lib/resources";
+import { ResourceCard } from "@/components/resources/resource-card";
+import { ResourceSearchFilter } from "@/components/resources/resource-search-filter";
+import { ResourceEmptyState } from "@/components/resources/resource-empty-state";
+import { BorrowRequestModal } from "@/components/resources/borrow-request-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 
 export default function ResourcesPage() {
-  const placeholderCategories = [
-    "Laboratory Equipment",
-    "Facility & Cleanrooms",
-    "High-Performance Compute",
-    "Field & Testing Devices",
-  ];
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<ResourceCategory | "All">("All");
+  const [selectedStatus, setSelectedStatus] = useState<ResourceStatus | "All">("All");
+  const [activeResourceForBorrow, setActiveResourceForBorrow] = useState<ResourceItem | null>(null);
+
+  // Quick stats
+  const stats = useMemo(() => getResourceStats(), []);
+
+  // Category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    MOCK_RESOURCES.forEach((r) => {
+      counts[r.category] = (counts[r.category] || 0) + 1;
+    });
+    return counts;
+  }, []);
+
+  // Filtered resources
+  const filteredResources = useMemo(() => {
+    return MOCK_RESOURCES.filter((resource) => {
+      // Search query filtering
+      if (searchQuery.trim() !== "") {
+        const q = searchQuery.toLowerCase().trim();
+        const matchName = resource.name.toLowerCase().includes(q);
+        const matchDesc = resource.description.toLowerCase().includes(q);
+        const matchDept = resource.department?.toLowerCase().includes(q) ?? false;
+        const matchLoc = resource.location.toLowerCase().includes(q);
+        const matchCat = resource.category.toLowerCase().includes(q);
+        const matchTags = resource.tags?.some((t) => t.toLowerCase().includes(q)) ?? false;
+        if (!matchName && !matchDesc && !matchDept && !matchLoc && !matchCat && !matchTags) {
+          return false;
+        }
+      }
+
+      // Category filter
+      if (selectedCategory !== "All" && resource.category !== selectedCategory) {
+        return false;
+      }
+
+      // Status filter
+      if (selectedStatus !== "All" && resource.status !== selectedStatus) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [searchQuery, selectedCategory, selectedStatus]);
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory("All");
+    setSelectedStatus("All");
+  };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header & Breadcrumb */}
-      <div className="mb-6 flex flex-col gap-2 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Link href="/" className="hover:text-slate-900 transition-colors">Home</Link>
-            <span>/</span>
-            <span className="text-slate-700 font-medium">Resources</span>
+    <div className="min-h-screen bg-slate-50/60 pb-16">
+      {/* Top Breadcrumb & Page Banner */}
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <nav aria-label="Breadcrumb" className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+                <Link href="/" className="hover:text-slate-900 transition-colors">
+                  Home
+                </Link>
+                <span>/</span>
+                <span className="font-medium text-slate-800">Resource Catalogue</span>
+              </nav>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                  Institutional Resource Catalogue
+                </h1>
+                <Badge variant="default" className="text-xs">
+                  TrustFlow Verified
+                </Badge>
+              </div>
+
+              <p className="mt-2 text-sm text-slate-500 max-w-2xl">
+                Browse shared scientific instrumentation, rapid fabrication tools, testing cleanrooms, and technical equipment available across university departments.
+              </p>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-600">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                <span>
+                  <strong className="text-slate-900 font-semibold">{stats.available}</strong> Available
+                </span>
+              </div>
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-600">
+                <span className="flex h-2 w-2 rounded-full bg-amber-500" />
+                <span>
+                  <strong className="text-slate-900 font-semibold">{stats.maintenance}</strong> In Maintenance
+                </span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Resource Discovery Catalog
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Institutional equipment and facilities directory with TrustFlow eligibility tracking.
-          </p>
-        </div>
-        <div>
-          <Badge variant="warning" className="px-3 py-1 text-xs">
-            Phase 1 Foundation &bull; Data Source Not Connected
-          </Badge>
         </div>
       </div>
 
-      {/* Placeholder Notice Banner */}
-      <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900">
-        <div className="flex items-start gap-3">
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-800 font-bold text-xs">
-            !
-          </div>
-          <div>
-            <span className="font-semibold">Discovery Catalog Placeholder:</span> Backend resource data endpoints (<code>/api/v1/resources</code>) will be integrated in Phase 2 once the database models are approved. No simulated data is being masqueraded as live inventory.
-          </div>
+      {/* Main Content Area */}
+      <main className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        {/* Search & Filter Component */}
+        <div className="mb-6">
+          <ResourceSearchFilter
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            selectedStatus={selectedStatus}
+            onStatusChange={setSelectedStatus}
+            onResetFilters={handleResetFilters}
+            totalCount={MOCK_RESOURCES.length}
+            filteredCount={filteredResources.length}
+            categoryCounts={categoryCounts}
+          />
         </div>
-      </div>
 
-      {/* Filter Bar Structure (Visual Specification) */}
-      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex-1">
-            <input
-              type="text"
-              disabled
-              placeholder="Search by equipment model, lab, or capability (Disabled in initial foundation)..."
-              className="w-full rounded-md border border-slate-300 bg-slate-50 px-3.5 py-2 text-sm text-slate-400 cursor-not-allowed"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {placeholderCategories.map((cat) => (
-              <span
-                key={cat}
-                className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 opacity-70"
-              >
-                {cat}
-              </span>
+        {/* Resources Grid or Empty State */}
+        {filteredResources.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredResources.map((resource) => (
+              <ResourceCard
+                key={resource.id}
+                resource={resource}
+                onRequestBorrow={(item) => setActiveResourceForBorrow(item)}
+              />
             ))}
           </div>
+        ) : (
+          <ResourceEmptyState
+            searchQuery={searchQuery}
+            category={selectedCategory}
+            status={selectedStatus}
+            onReset={handleResetFilters}
+          />
+        )}
+
+        {/* Bottom Navigation */}
+        <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-6">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="gap-2 text-slate-600 hover:text-slate-900">
+              <ArrowLeft className="h-4 w-4" />
+              Return to Platform Overview
+            </Button>
+          </Link>
+          <p className="text-xs text-slate-400">
+            ResourceLoop &bull; Hackathon MVP Discovery Catalogue
+          </p>
         </div>
-      </div>
+      </main>
 
-      {/* Placeholder Grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3].map((item) => (
-          <Card key={item} className="border-dashed border-slate-300 bg-slate-50/50">
-            <CardHeader className="p-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-slate-400">PLANNED SLOT #{item}</span>
-                <Badge variant="secondary" className="text-[10px]">Awaiting DB Schema</Badge>
-              </div>
-              <CardTitle className="text-base font-semibold text-slate-700 mt-2">
-                Catalog Item Template #{item}
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-400">
-                Department, location, specifications, and custodian details will be rendered here dynamically upon API endpoint activation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-5 pt-0">
-              <div className="space-y-2 border-t border-slate-200 pt-3 text-xs text-slate-400">
-                <div className="flex justify-between">
-                  <span>TrustFlow Stage:</span>
-                  <span className="font-mono">ELIGIBILITY CHECK</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Required Induction:</span>
-                  <span className="font-mono">PENDING SEED</span>
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button disabled variant="outline" size="sm" className="w-full text-xs cursor-not-allowed">
-                  Request via TrustFlow (Locked)
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Return to Landing Page */}
-      <div className="mt-12 text-center">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="text-slate-600">
-            &larr; Return to Platform Overview
-          </Button>
-        </Link>
-      </div>
+      {/* Borrow Request Modal */}
+      <BorrowRequestModal
+        resource={activeResourceForBorrow}
+        isOpen={Boolean(activeResourceForBorrow)}
+        onClose={() => setActiveResourceForBorrow(null)}
+      />
     </div>
   );
 }
